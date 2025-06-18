@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>공통국어 천재(김수학) 시험대비 사이트</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
     <style>
         body {
             font-family: 'Noto Sans KR', sans-serif;
@@ -21,40 +22,418 @@
             color: #1d4ed8;
             font-weight: 700;
         }
-        /* 정답 숨김/보임 스타일 */
+        .quiz-sub-tab-btn.active {
+            border-color: #f59e0b;
+            background-color: #fffbeb;
+            color: #b45309;
+            font-weight: 700;
+        }
         .answer.hidden {
             display: none;
+        }
+        /* --- Quiz Styles --- */
+        .quiz-body {
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            touch-action: manipulation;
+            overscroll-behavior-y: contain;
+        }
+        .target {
+            transition: transform 0.1s ease-out, background-color 0.3s ease;
+            cursor: pointer;
+        }
+        .target:active {
+            transform: scale(0.95);
+        }
+        .player-character {
+            width: 60px;
+            height: 80px;
+            fill: currentColor;
+        }
+        #timer-bar-fill {
+            transition: width 0.2s linear;
+        }
+        .shot-effect {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: yellow;
+            border-radius: 50%;
+            opacity: 0.7;
+            animation: shot-animation 0.3s ease-out forwards;
+            pointer-events: none;
+        }
+        @keyframes shot-animation {
+            0% { transform: scale(0.5); opacity: 0.7; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        #fireworks-container {
+            position: absolute; /* Changed from fixed to be contained */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+            overflow: hidden;
+            border-radius: 0.75rem; /* Match parent container */
+        }
+        .firework {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            opacity: 0;
+            animation: firework-burst 1.5s ease-out forwards;
+        }
+        @keyframes firework-burst {
+            0% { opacity: 1; transform: scale(0.3) translateY(0); }
+            50% { opacity: 0.9; transform: scale(1.2); }
+            100% { opacity: 0; transform: scale(0.5) translateY(-150px); }
+        }
+        @media (hover: none) {
+            .target:active {
+                background-color: #e2e8f0;
+            }
+        }
+        #ranking-board ol {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        #ranking-board li {
+            background-color: rgba(255, 255, 255, 0.05);
+            margin-bottom: 8px;
+            padding: 10px 15px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #ranking-board li .rank-name {
+            font-weight: 500;
+        }
+        #ranking-board li .rank-score {
+            font-weight: bold;
+            color: #4ade80;
+        }
+        #incorrect-answers-list .question-item {
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #334155;
+        }
+        #incorrect-answers-list .question-item:last-child {
+            border-bottom: none;
         }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
 
     <div class="container mx-auto p-4 md:p-8 max-w-7xl">
-        <!-- 헤더 -->
         <header class="text-center mb-8">
             <h1 class="text-3xl md:text-4xl font-bold text-blue-600">공통국어 천재(김수학) 시험대비 사이트</h1>
             <p class="text-slate-500 mt-2">챕터별 핵심 포인트와 문제로 시험을 완벽 대비하세요.</p>
         </header>
 
-        <!-- 메인 탭 -->
         <div id="main-tabs" class="flex flex-wrap justify-center gap-2 mb-6">
             <!-- 탭 버튼은 JS로 생성 -->
         </div>
 
-        <!-- 콘텐츠 영역 -->
-        <main id="content-area" class="bg-white p-6 rounded-xl shadow-lg">
-            <!-- 서브 탭 -->
+        <main id="content-area" class="bg-white p-6 rounded-xl shadow-lg relative">
             <div id="sub-tabs" class="border-b border-slate-200 mb-6 flex space-x-2">
                  <!-- 서브 탭 버튼은 JS로 생성 -->
             </div>
             
-            <!-- 내용 표시 -->
             <div id="display-content" class="prose max-w-none prose-slate">
                 <!-- 콘텐츠는 JS로 생성 -->
             </div>
+
+            <div id="quiz-display-area" class="hidden">
+                 <!-- 샷건 퀴즈 콘텐츠가 여기에 삽입됩니다 -->
+                <div id="game-container" class="w-full max-w-3xl mx-auto text-center flex flex-col quiz-body bg-slate-900 text-white p-4 sm:p-6 rounded-lg">
+                    <header class="mb-8 flex-shrink-0">
+                        <h1 class="text-4xl font-bold text-amber-400">소통의 원리 샷건 퀴즈!</h1>
+                        <p class="text-slate-300">국어 화법편</p>
+                    </header>
+
+                    <div id="start-screen" class="flex flex-col items-center justify-center flex-grow">
+                        <svg class="player-character text-sky-400 mb-6" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.6193 2 9.5 3.11929 9.5 4.5C9.5 5.88071 10.6193 7 12 7C13.3807 7 14.5 5.88071 14.5 4.5C14.5 3.11929 13.3807 2 12 2Z"/><path d="M12 9C9.23858 9 7 11.2386 7 14V22H9V14C9 12.3431 10.3431 11 12 11C13.6569 11 15 12.3431 15 14V22H17V14C17 11.2386 14.7614 9 12 9Z"/><path d="M6 16H4V14C4 12.3431 5.34315 11 7 11V13C6.44772 13 6 13.4477 6 14V16Z" /><path d="M18 16H20V14C20 12.3431 18.6569 11 17 11V13C17.5523 13 18 13.4477 18 14V16Z" /></svg>
+                        <p class="text-lg text-slate-200 mb-4">대화의 원리를 퀴즈로 풀어보세요! <br> 문제는 중앙에, 보기 3개는 목표물에 나타납니다. 20초 안에 정답을 쏘세요!</p>
+                        <input type="text" id="player-name" placeholder="도전자의 이름을 입력하세요" class="mb-4 p-3 rounded-md text-slate-900 w-full max-w-xs text-center border border-slate-400 focus:ring-2 focus:ring-amber-400 outline-none">
+                        <button id="challenge-button" class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 px-8 rounded-lg text-xl shadow-lg transform hover:scale-105 transition-transform">도전!</button>
+                        <p id="name-error" class="text-red-400 mt-2 hidden">이름을 입력해주세요!</p>
+                        <p id="audio-error-message" class="text-yellow-400 mt-2 hidden">오디오 초기화 중 문제가 발생했습니다.</p>
+                    </div>
+
+                    <div id="game-screen" class="hidden w-full flex flex-col flex-grow">
+                        <div class="flex justify-between items-center mb-4 px-2 flex-shrink-0">
+                            <div class="text-xl sm:text-2xl font-semibold">점수: <span id="score" class="text-green-400">0</span></div>
+                            <div class="player-character-ingame" style="text-align: center;"><svg class="player-character text-sky-400 inline-block h-12 w-12 sm:h-16 sm:w-16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.6193 2 9.5 3.11929 9.5 4.5C9.5 5.88071 10.6193 7 12 7C13.3807 7 14.5 5.88071 14.5 4.5C14.5 3.11929 13.3807 2 12 2Z"/><path d="M12 9C9.23858 9 7 11.2386 7 14V22H9V14C9 12.3431 10.3431 11 12 11C13.6569 11 15 12.3431 15 14V22H17V14C17 11.2386 14.7614 9 12 9Z"/><path d="M6 16H4V14C4 12.3431 5.34315 11 7 11V13C6.44772 13 6 13.4477 6 14V16Z" /><path d="M18 16H20V14C20 12.3431 18.6569 11 17 11V13C17.5523 13 18 13.4477 18 14V16Z" /></svg><span class="text-2xl sm:text-3xl align-middle">🔫</span></div>
+                            <div class="text-xl sm:text-2xl font-semibold">시간: <span id="time" class="text-red-400">20</span></div>
+                        </div>
+                        <div id="timer-bar-container" class="w-full h-4 bg-slate-700 rounded-full overflow-hidden mb-6 shadow-md flex-shrink-0"><div id="timer-bar-fill" class="h-full bg-red-500 rounded-full" style="width: 100%;"></div></div>
+                        <div id="question-area" class="bg-slate-800 p-6 rounded-lg shadow-xl mb-8 min-h-[100px] flex items-center justify-center flex-shrink-0"><p id="question-text" class="text-xl md:text-2xl text-slate-100"></p></div>
+                        <div id="targets-area" class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8 flex-grow"></div>
+                        <div id="message-area" class="min-h-[50px] mt-6 flex-shrink-0"><p id="message-text" class="text-2xl font-bold"></p></div>
+                        <button id="next-question-button" class="hidden mt-6 bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-md flex-shrink-0">다음 문제</button>
+                    </div>
+
+                    <div id="end-screen" class="hidden flex flex-col items-center justify-center flex-grow">
+                        <h2 id="end-title" class="text-3xl font-bold text-amber-400 mb-4">게임 종료!</h2>
+                        <p class="text-xl mb-2">플레이어: <span id="end-player-name" class="text-sky-300 font-bold"></span></p>
+                        <p class="text-xl mb-2">최종 점수: <span id="final-score" class="text-green-400 font-bold">0</span>점 (100점 만점)</p>
+                        <p id="end-message" class="text-lg text-slate-300 mb-6"></p>
+                        <button id="restart-button" class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 px-8 rounded-lg text-xl shadow-lg mb-4">다시 도전!</button>
+                        <div id="ranking-board" class="w-full max-w-md text-left bg-slate-800 p-6 rounded-lg shadow-xl mb-8"><h3 class="text-2xl font-semibold text-amber-300 mb-4 text-center">🏆 명예의 전당 🏆</h3><ol id="ranking-list" class="space-y-2"></ol></div>
+                        <div id="incorrect-answers-section" class="hidden w-full max-w-md text-left bg-slate-800 p-6 rounded-lg shadow-xl"><h3 class="text-2xl font-semibold text-red-400 mb-4 text-center">오답 노트 📝</h3><div id="incorrect-answers-list"></div></div>
+                    </div>
+                </div>
+                <div id="fireworks-container"></div>
+                <script type="module">
+                    // Firebase SDK imports
+                    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+                    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+                    
+                    const firebaseConfig = {
+                        apiKey: "AIzaSyDcagfE320vd1DuT6uZ8mHhVy2yB74C1q0", 
+                        authDomain: "grammar-294b6.firebaseapp.com",
+                        projectId: "grammar-294b6",
+                        storageBucket: "grammar-294b6.appspot.com", 
+                        messagingSenderId: "865611264169",
+                        appId: "1:865611264169:web:4eeb0da057258f3ed139b8",
+                        measurementId: "G-4V796145C9"
+                    };
+
+                    let app;
+                    let db;
+                    try { app = initializeApp(firebaseConfig); db = getFirestore(app); console.log("Firebase initialized."); } catch (e) { console.error("Firebase init failed:", e); }
+
+                    const startScreen = document.getElementById('start-screen');
+                    const gameScreen = document.getElementById('game-screen');
+                    const endScreen = document.getElementById('end-screen');
+                    const challengeButton = document.getElementById('challenge-button');
+                    const playerNameInput = document.getElementById('player-name');
+                    const nameErrorText = document.getElementById('name-error');
+                    const audioErrorMessage = document.getElementById('audio-error-message');
+                    const restartButton = document.getElementById('restart-button');
+                    const nextQuestionButton = document.getElementById('next-question-button');
+                    const scoreDisplay = document.getElementById('score');
+                    const timeDisplay = document.getElementById('time');
+                    const timerBarFill = document.getElementById('timer-bar-fill');
+                    const questionText = document.getElementById('question-text');
+                    const targetsArea = document.getElementById('targets-area');
+                    const messageText = document.getElementById('message-text');
+                    const endPlayerNameDisplay = document.getElementById('end-player-name');
+                    const finalScoreDisplay = document.getElementById('final-score');
+                    const endTitle = document.getElementById('end-title');
+                    const endMessage = document.getElementById('end-message');
+                    const fireworksContainer = document.getElementById('fireworks-container');
+                    const rankingBoard = document.getElementById('ranking-board');
+                    const rankingList = document.getElementById('ranking-list');
+                    const incorrectAnswersSection = document.getElementById('incorrect-answers-section');
+                    const incorrectAnswersList = document.getElementById('incorrect-answers-list');
+
+                    const MAX_QUESTIONS = 10;
+                    const CORRECT_ANSWER_SCORE = 10;
+                    const AUTO_NEXT_QUESTION_DELAY = 1500;
+                    const QUESTION_TIME_LIMIT = 20;
+
+                    const baseQuestions = [
+                        { question: "화자와 청자가 대화의 목적에 맞게 협력해야 한다는 원리는?", options: ["공손성의 원리", "협력의 원리", "체면 유지의 원리"], correctAnswer: "협력의 원리", explanation: "협력의 원리는 대화 참여자들이 대화의 목적이나 요구에 맞게 협력하여 대화해야 한다는 원칙입니다." },
+                        { question: "대화의 목적에 필요한 만큼의 정보만 제공해야 한다는 격률은?", options: ["질의 격률", "관련성의 격률", "양의 격률"], correctAnswer: "양의 격률", explanation: "양의 격률은 대화에 필요한 만큼의 정보만 제공하고, 너무 많거나 적은 정보를 제공하지 말아야 한다는 규칙입니다." },
+                        { question: "타당한 근거를 들어 진실을 말해야 한다는 격률은?", options: ["질의 격률", "태도의 격률", "양의 격률"], correctAnswer: "질의 격률", explanation: "질의 격률은 거짓이라고 생각하거나 타당한 근거가 없는 것은 말하지 말아야 한다는 규칙입니다." },
+                        { question: "대화 주제와 관련 없는 말을 하는 것은 어떤 격률 위반인가?", options: ["양의 격률", "관련성의 격률", "태도의 격률"], correctAnswer: "관련성의 격률", explanation: "관련성의 격률은 대화의 목적이나 주제, 화제와 관련된 것을 말해야 한다는 규칙입니다." },
+                        { question: "모호하거나 중의적 표현을 피하고 명료하게 말해야 한다는 격률은?", options: ["질의 격률", "양의 격률", "태도의 격률"], correctAnswer: "태도의 격률", explanation: "태도의 격률은 표현의 모호성을 피하고, 간결하고 조리 있게 말해야 한다는 규칙입니다." },
+                        { question: "상대에게 공손한 표현을 최대화하는 원리는?", options: ["협력의 원리", "공손성의 원리", "체면 유지의 원리"], correctAnswer: "공손성의 원리", explanation: "공손성의 원리는 화자와 청자가 서로를 존중하고 배려하며 대화해야 한다는 원칙입니다." },
+                        { question: "상대에게 부담을 줄이고 이익을 늘리는 격률은?", options: ["요령의 격률", "관용의 격률", "찬동의 격률"], correctAnswer: "요령의 격률", explanation: "요령의 격률은 상대방에게 부담이 되는 표현은 최소화하고 이익이 되는 표현을 최대화하는 것입니다." },
+                        { question: "자신에게 부담을 주는 표현을 늘리는 것은 어떤 격률인가?", options: ["요령의 격률", "겸양의 격률", "관용의 격률"], correctAnswer: "관용의 격률", explanation: "관용의 격률은 자신에게 이익이 되는 표현은 최소화하고 부담을 주는 표현을 최대화하는 것입니다." },
+                        { question: "상대를 칭찬하는 말을 늘리는 것은 어떤 격률인가?", options: ["찬동의 격률", "요령의 격률", "겸양의 격률"], correctAnswer: "찬동의 격률", explanation: "찬동의 격률은 상대방에 대한 비방을 최소화하고 칭찬을 최대화하는 것입니다." },
+                        { question: "자신을 낮추어 겸손하게 말하는 격률은?", options: ["찬동의 격률", "겸양의 격률", "동의의 격률"], correctAnswer: "겸양의 격률", explanation: "겸양의 격률은 자신에 대한 칭찬은 최소화하고 자신을 낮추는 표현을 최대화하는 것입니다." },
+                        { question: "상대방과 의견 차이를 줄이려는 격률은?", options: ["관용의 격률", "동의의 격률", "요령의 격률"], correctAnswer: "동의의 격률", explanation: "동의의 격률은 상대방과의 의견 차이를 최소화하고 일치점을 최대화하여 표현하는 것입니다." },
+                        { question: "스스로 내세우고 보호받고자 하는 공개적인 이미지는?", options: ["자존감", "체면", "인격"], correctAnswer: "체면", explanation: "체면은 대화 참여자가 대화 상황에서 손상되지 않기를 바라는 개인의 자존심이나 공개적인 이미지를 말합니다." },
+                        { question: "외부 간섭에서 벗어나 스스로 선택하고 싶은 욕구는 어떤 체면인가?", options: ["적극적 체면", "소극적 체면", "개인적 체면"], correctAnswer: "소극적 체면", explanation: "소극적 체면은 다른 사람에게 방해받지 않고 자신의 자유를 누리고 싶어 하는 욕구입니다." },
+                        { question: "'혹시 덥지 않니?'라고 말하는 것은 상대의 어떤 체면을 지켜주기 위함인가?", options: ["적극적 체면", "소극적 체면", "둘 다 해당 없음"], correctAnswer: "소극적 체면", explanation: "상대방이 거절할 수 있는 여지를 줌으로써, 상대가 스스로 선택하려는 욕구, 즉 소극적 체면을 존중하는 표현입니다." },
+                        { question: "언어 공동체에서 형성된 고유의 대화 방식을 무엇이라 하나요?", options: ["개인어", "방언", "담화 관습"], correctAnswer: "담화 관습", explanation: "담화 관습은 특정 공동체 안에서 오랫동안 형성된 고유의 대화 방식이나 문화를 의미합니다." },
+                    ];
+                    
+                    let currentQuestionIndex, score, timeLeft, timerInterval, gameActive, shuffledQuestions = [], playerName = "", consecutiveCorrectAnswers, incorrectlyAnsweredQuestions = [];
+                    let soundsReady = false;
+                    let shootSound, correctAnswerSound, incorrectAnswerSound, timeUpSound, gameEndSound, gameStartSound, fireworksSound;
+                    
+                    async function initAudio() {
+                        try {
+                            if (Tone.context.state !== 'running') await Tone.start();
+                            if (Tone.context.state === 'running') {
+                                shootSound = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.1 }, volume: -3 }).toDestination();
+                                correctAnswerSound = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.2 }, volume: -8 }).toDestination();
+                                incorrectAnswerSound = new Tone.Synth({ oscillator: { type: 'square' }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.2 }, volume: -12 }).toDestination();
+                                timeUpSound = new Tone.NoiseSynth({ noise: { type: 'brown' }, envelope: { attack: 0.05, decay: 0.3, sustain: 0, release: 0.1 }, volume: -18 }).toDestination();
+                                gameEndSound = new Tone.Synth({ oscillator: { type: 'sawtooth' }, envelope: { attack: 0.1, decay: 0.5, sustain: 0.3, release: 0.5 }, volume: -10 }).toDestination();
+                                gameStartSound = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.05, decay: 0.3, sustain: 0.1, release: 0.3 }, volume: -10 }).toDestination();
+                                fireworksSound = new Tone.Synth({ oscillator: {type: "triangle"}, envelope: {attack: 0.01, decay: 0.5, sustain: 0.1, release: 1}, volume: -5 }).toDestination();
+                                soundsReady = true;
+                            } else { audioErrorMessage.classList.remove('hidden'); }
+                        } catch (e) { audioErrorMessage.classList.remove('hidden'); }
+                    }
+
+                    challengeButton.addEventListener('click', () => {
+                        playerName = playerNameInput.value.trim();
+                        if (!playerName) { nameErrorText.classList.remove('hidden'); return; }
+                        nameErrorText.classList.add('hidden');
+                        initAudio().then(() => { if (soundsReady) gameStartSound.triggerAttackRelease('G4', '4n', Tone.now()); });
+                        startScreen.classList.add('hidden');
+                        endScreen.classList.add('hidden');
+                        incorrectAnswersSection.classList.add('hidden');
+                        gameScreen.classList.remove('hidden');
+                        initializeGameLogic();
+                    });
+
+                    restartButton.addEventListener('click', () => {
+                        endScreen.classList.add('hidden');
+                        incorrectAnswersSection.classList.add('hidden');
+                        startScreen.classList.remove('hidden');
+                        playerNameInput.value = "";
+                    });
+
+                    nextQuestionButton.addEventListener('click', loadNextQuestion);
+
+                    function shuffleArray(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; } return array; }
+                    function generateQuestionSet() { shuffledQuestions = shuffleArray([...baseQuestions]).slice(0, MAX_QUESTIONS); }
+                    function initializeGameLogic() { generateQuestionSet(); currentQuestionIndex = 0; score = 0; incorrectlyAnsweredQuestions = []; updateScoreDisplay(); loadQuestion(); }
+
+                    function loadQuestion() {
+                        if (currentQuestionIndex >= shuffledQuestions.length) { endGame(); return; }
+                        gameActive = true;
+                        const currentQuestion = shuffledQuestions[currentQuestionIndex];
+                        questionText.textContent = `(${currentQuestionIndex + 1}/${shuffledQuestions.length}) ${currentQuestion.question}`;
+                        targetsArea.innerHTML = '';
+                        messageText.textContent = '';
+                        nextQuestionButton.classList.add('hidden');
+                        timerBarFill.style.width = '100%';
+                        timerBarFill.className = 'h-full bg-red-500 rounded-full';
+
+                        const shuffledOptions = shuffleArray([...currentQuestion.options]);
+                        shuffledOptions.forEach(option => {
+                            const target = document.createElement('button');
+                            target.className = 'target bg-slate-700 hover:bg-slate-600 text-amber-300 p-4 sm:p-6 rounded-lg shadow-md text-lg sm:text-xl h-full flex items-center justify-center min-h-[80px] sm:min-h-[100px]';
+                            target.textContent = option;
+                            const eventType = ('ontouchstart' in window) ? 'touchstart' : 'click';
+                            target.addEventListener(eventType, (e) => { e.preventDefault(); handleTargetClick(option, currentQuestion.correctAnswer, target, e); });
+                            targetsArea.appendChild(target);
+                        });
+
+                        timeLeft = QUESTION_TIME_LIMIT;
+                        updateTimerDisplay();
+                        if (timerInterval) clearInterval(timerInterval);
+                        timerInterval = setInterval(updateGameTimer, 1000);
+                    }
+                    
+                    function handleTargetClick(selected, correct, element, event) {
+                        if (!gameActive) return;
+                        gameActive = false;
+                        clearInterval(timerInterval);
+                        if (soundsReady) shootSound.triggerAttackRelease("0.05s", Tone.now());
+
+                        Array.from(targetsArea.children).forEach(btn => { btn.disabled = true; btn.classList.add('opacity-70'); });
+
+                        if (selected === correct) {
+                            score += CORRECT_ANSWER_SCORE;
+                            messageText.textContent = "정답입니다! 🎉";
+                            messageText.className = 'text-2xl font-bold text-green-400';
+                            element.className = element.className.replace('bg-slate-700', 'bg-green-500') + ' text-white ring-2 ring-green-300';
+                            if (soundsReady) correctAnswerSound.triggerAttackRelease('C5', '8n', Tone.now() + 0.1);
+                            showFireworks();
+                            if (soundsReady) { try { fireworksSound.triggerAttackRelease("C4", "1n", Tone.now()); } catch(e){} }
+                            setTimeout(loadNextQuestion, AUTO_NEXT_QUESTION_DELAY);
+                        } else {
+                            messageText.textContent = `오답! 정답은 "${correct}"`;
+                            messageText.className = 'text-2xl font-bold text-red-400';
+                            element.className = element.className.replace('bg-slate-700', 'bg-red-500') + ' text-white ring-2 ring-red-300';
+                            Array.from(targetsArea.children).forEach(btn => { if(btn.textContent === correct) btn.className = btn.className.replace('bg-slate-700', 'bg-green-500') + ' text-white ring-2 ring-green-300'; });
+                            incorrectlyAnsweredQuestions.push(shuffledQuestions[currentQuestionIndex]);
+                            if (soundsReady) incorrectAnswerSound.triggerAttackRelease('F#3', '4n', Tone.now() + 0.1);
+                            nextQuestionButton.classList.remove('hidden');
+                        }
+                        updateScoreDisplay();
+                    }
+
+                    function showFireworks() {
+                        const colors = ['#FFD700', '#FF6347', '#ADFF2F', '#87CEFA', '#DA70D6'];
+                        for (let i = 0; i < 30; i++) {
+                            const fw = document.createElement('div');
+                            fw.className = 'firework';
+                            fw.style.left = `${Math.random() * 100}%`;
+                            fw.style.top = `${Math.random() * 80 + 10}%`;
+                            fw.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                            fw.style.animationDelay = `${Math.random() * 0.5}s`;
+                            fireworksContainer.appendChild(fw);
+                        }
+                        setTimeout(() => fireworksContainer.innerHTML = '', 2000);
+                    }
+
+                    function updateGameTimer() {
+                        timeLeft--;
+                        updateTimerDisplay();
+                        if (timeLeft <= 0) { clearInterval(timerInterval); handleTimeUp(); }
+                    }
+
+                    function handleTimeUp() {
+                        if(!gameActive) return;
+                        gameActive = false;
+                        const correctAns = shuffledQuestions[currentQuestionIndex].correctAnswer;
+                        messageText.textContent = `시간 초과! 정답은 "${correctAns}"`;
+                        messageText.className = 'text-2xl font-bold text-yellow-400';
+                        if (soundsReady) timeUpSound.triggerAttackRelease('2n', Tone.now());
+                        Array.from(targetsArea.children).forEach(btn => { btn.disabled = true; if(btn.textContent === correctAns) btn.className = btn.className.replace('bg-slate-700', 'bg-green-500') + ' text-white';});
+                        incorrectlyAnsweredQuestions.push(shuffledQuestions[currentQuestionIndex]);
+                        nextQuestionButton.classList.remove('hidden');
+                    }
+
+                    function loadNextQuestion() { currentQuestionIndex++; loadQuestion(); }
+                    function updateScoreDisplay() { scoreDisplay.textContent = score; }
+                    function updateTimerDisplay() {
+                        timeDisplay.textContent = timeLeft;
+                        const percentage = Math.max(0, (timeLeft / QUESTION_TIME_LIMIT) * 100);
+                        timerBarFill.style.width = `${percentage}%`;
+                        if (timeLeft <= 5) timerBarFill.className = 'h-full bg-orange-500 rounded-full animate-pulse';
+                        else timerBarFill.className = 'h-full bg-red-500 rounded-full';
+                    }
+                    async function saveRanking(name, score) { if (!db) return; try { await addDoc(collection(db, "rankingsCommunication"), { name, score, timestamp: serverTimestamp() }); } catch (e) { console.error(e); } }
+                    async function displayRankings() {
+                        if (!db) { rankingList.innerHTML = '<li>랭킹 기능 오류</li>'; return; }
+                        rankingList.innerHTML = '<li>랭킹 로딩 중...</li>';
+                        try {
+                            const q = query(collection(db, "rankingsCommunication"), orderBy("score", "desc"), orderBy("timestamp", "asc"), limit(5));
+                            const querySnapshot = await getDocs(q);
+                            rankingList.innerHTML = '';
+                            if (querySnapshot.empty) { rankingList.innerHTML = '<li>아직 기록이 없습니다.</li>'; }
+                            else { let rank = 0; querySnapshot.forEach(doc => { rank++; const data = doc.data(); const li = document.createElement('li'); li.innerHTML = `<span class="rank-name"><span class="text-amber-400">${rank}.</span> ${escapeHTML(data.name)}</span><span class="rank-score">${data.score}점</span>`; rankingList.appendChild(li); }); }
+                        } catch (e) { rankingList.innerHTML = '<li>랭킹 로딩 실패</li>'; }
+                    }
+                    function displayIncorrectAnswers() {
+                        incorrectAnswersList.innerHTML = '';
+                        if (incorrectlyAnsweredQuestions.length > 0) {
+                            incorrectAnswersSection.classList.remove('hidden');
+                            incorrectlyAnsweredQuestions.forEach(q => { const item = document.createElement('div'); item.className = 'question-item'; item.innerHTML = `<p class="font-semibold text-slate-200">질문: ${escapeHTML(q.question)}</p><p class="text-green-400">정답: ${escapeHTML(q.correctAnswer)}</p><p class="text-sky-300">해설: ${escapeHTML(q.explanation || "")}</p>`; incorrectAnswersList.appendChild(item); });
+                        } else { incorrectAnswersSection.classList.remove('hidden'); incorrectAnswersList.innerHTML = '<p class="text-green-400 text-center font-semibold">오답이 없습니다! 완벽해요! 🎉</p>'; }
+                    }
+                    function escapeHTML(str) { if (!str) return ''; return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]); }
+                    async function endGame() {
+                        if (timerInterval) clearInterval(timerInterval);
+                        gameScreen.classList.add('hidden');
+                        endScreen.classList.remove('hidden');
+                        endPlayerNameDisplay.textContent = escapeHTML(playerName);
+                        finalScoreDisplay.textContent = score;
+                        if (db) { await saveRanking(playerName, score); await displayRankings(); } else { rankingList.innerHTML = '<li>랭킹 기능 오류</li>'; }
+                        displayIncorrectAnswers();
+                        let finalMsg = "수고하셨습니다!";
+                        if (score >= 80) finalMsg = "소통의 달인이시군요! 🏆";
+                        else if (score >= 50) finalMsg = "훌륭해요! 👍";
+                        endMessage.textContent = finalMsg;
+                        if (soundsReady) gameEndSound.triggerAttackRelease('C4', '1n', Tone.now());
+                    }
+                </script>
+            </div>
         </main>
 
-        <!-- 푸터 -->
         <footer class="text-center mt-8 text-sm text-slate-400">
             <p>&copy; 2024 국어 시험 마스터. All rights reserved.</p>
         </footer>
@@ -159,12 +538,23 @@
         // 서브 탭 렌더링
         function renderSubTabs() {
             subTabsContainer.innerHTML = '';
-            const subTabNames = ['출제포인트 30', '단답형 문제 30'];
+            let subTabNames = ['출제포인트 30', '단답형 문제 30'];
             
+            // 1장일 때만 샷건 퀴즈 탭 추가
+            if (currentChapterIndex === 0) {
+                subTabNames.push('샷건 퀴즈');
+            }
+
             subTabNames.forEach((name, index) => {
                 const button = document.createElement('button');
                 button.textContent = name;
-                button.className = 'sub-tab-btn px-4 py-2 text-sm font-medium border-b-2 transition';
+                let btnClass = 'sub-tab-btn px-4 py-2 text-sm font-medium border-b-2 transition';
+                if (name === '샷건 퀴즈') {
+                     btnClass += ' quiz-sub-tab-btn';
+                }
+
+                button.className = btnClass;
+
                 if (index === currentSubTabIndex) {
                     button.classList.add('active');
                 } else {
@@ -172,7 +562,8 @@
                 }
                 button.onclick = () => {
                     currentSubTabIndex = index;
-                    updateContent();
+                    renderSubTabs(); // Re-render to update active state
+                    renderDisplayContent();
                 };
                 subTabsContainer.appendChild(button);
             });
@@ -207,65 +598,58 @@
 
         // 콘텐츠 내용 렌더링
         function renderDisplayContent() {
-            contentDisplay.innerHTML = '';
-            
+            const displayContent = document.getElementById('display-content');
+            const quizDisplayArea = document.getElementById('quiz-display-area');
+
+            // Hide all content areas first
+            displayContent.classList.add('hidden');
+            quizDisplayArea.classList.add('hidden');
+            displayContent.innerHTML = ''; // Clear previous content
+
             const currentData = studyData[currentChapterIndex];
 
-            if (currentSubTabIndex === 0) { // 출제포인트
+            if (currentSubTabIndex === 2 && currentChapterIndex === 0) {
+                // Show Quiz
+                quizDisplayArea.classList.remove('hidden');
+            } else if (currentSubTabIndex === 0) {
+                // Show Points
+                displayContent.classList.remove('hidden');
                 const listElement = document.createElement('ol');
                 listElement.className = 'list-decimal list-inside space-y-4';
                 currentData.points.forEach(item => {
                     const listItem = document.createElement('li');
                     listItem.className = 'leading-relaxed';
-                    
                     const parts = item.split(': ');
                     if (parts.length > 1) {
-                        const concept = parts[0];
-                        const description = parts.slice(1).join(': ');
-                        listItem.innerHTML = `<strong>${concept}:</strong> ${description}`;
+                        listItem.innerHTML = `<strong>${parts[0]}:</strong> ${parts.slice(1).join(': ')}`;
                     } else {
                         listItem.textContent = item;
                     }
-                    
                     listElement.appendChild(listItem);
                 });
-                contentDisplay.appendChild(listElement);
+                displayContent.appendChild(listElement);
 
-            } else { // 단답형 문제
-                contentDisplay.appendChild(createAnswerButton());
-
+            } else { // Show Questions
+                displayContent.classList.remove('hidden');
+                displayContent.appendChild(createAnswerButton());
                 const listElement = document.createElement('ol');
                 listElement.className = 'list-decimal list-inside space-y-6';
-                
                 currentData.questions.forEach((question, index) => {
                     const answer = currentData.answers[index];
                     const chosungHint = getChosung(answer);
-
                     const listItem = document.createElement('li');
                     listItem.className = 'leading-relaxed pb-2 border-b border-slate-100';
-                    
-                    const questionDiv = document.createElement('div');
-                    questionDiv.textContent = question;
-
-                    const hintDiv = document.createElement('div');
-                    hintDiv.className = 'text-sm text-gray-500 mt-1';
-                    hintDiv.textContent = `[초성 힌트: ${chosungHint}]`;
-
-                    const answerDiv = document.createElement('div');
-                    answerDiv.className = 'answer hidden text-blue-600 font-bold mt-2';
-                    answerDiv.textContent = `정답: ${answer}`;
-                    
-                    listItem.appendChild(questionDiv);
-                    listItem.appendChild(hintDiv);
-                    listItem.appendChild(answerDiv);
+                    listItem.innerHTML = `
+                        <div>${question}</div>
+                        <div class="text-sm text-gray-500 mt-1">[초성 힌트: ${chosungHint}]</div>
+                        <div class="answer hidden text-blue-600 font-bold mt-2">정답: ${answer}</div>
+                    `;
                     listElement.appendChild(listItem);
                 });
-                contentDisplay.appendChild(listElement);
-                
-                // 하단 버튼 추가
+                displayContent.appendChild(listElement);
                 const bottomButton = createAnswerButton();
                 bottomButton.classList.add('mt-6');
-                contentDisplay.appendChild(bottomButton);
+                displayContent.appendChild(bottomButton);
             }
         }
 
